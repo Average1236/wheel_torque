@@ -123,6 +123,80 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi) {
     }
 }
 
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c == &hi2c1) {
+        // HAL_DMA_Abort(hi2c->hdmarx); // Abort the DMA to reset its state, so that the next call to HAL_I2C_Slave_Receive_DMA() can succeed
+        uint8_t cmd = i2c_rx_buf[0] & 0xF0; // Only consider the upper 4 bits as the command header
+        switch (cmd) {
+            case CMD_SET_MODE: {
+                switch (i2c_rx_buf[1])
+                {
+                case CommandMode::MODE_TOR:
+                    controller.config_.set_control_mode(Controller::ControlMode::MODE_TORQUE_CONTROL);
+                    break;
+
+                case CommandMode::MODE_VEL_TOR:
+                    controller.config_.set_control_mode(Controller::ControlMode::MODE_VELOCITY_CONTROL);
+                    break;
+
+                case CommandMode::MODE_IDLE:
+                    controller.config_.set_control_mode(Controller::ControlMode::MODE_IDLE);
+                    break;
+                
+                default:
+                    break;
+                }
+                HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+            } break;
+
+            case CMD_VEL_TOR: {
+                bool vel_positive = (i2c_rx_buf[0] & 0x08) != 0;
+                uint16_t vel_int = ((i2c_rx_buf[0] & 0x07) << 8) | i2c_rx_buf[1];
+                controller.input_vel_ = vel_positive ? (float)vel_int / 20.0f : -(float)vel_int / 20.0f; // Maximum velocity is 102.3 turn/s
+                bool tor_positive = (i2c_rx_buf[2] & 0x80) != 0;
+                uint16_t tor_int = i2c_rx_buf[2] & 0x7F;
+                controller.input_torque_ = tor_positive ? (float)tor_int / 250.0f : -(float)tor_int / 250.0f; // Maximum torque is 0.508 Nm
+                HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+            } break;
+
+            case CMD_TOR: {
+                bool tor_positive = (i2c_rx_buf[1] & 0x80) != 0;
+                uint16_t tor_int = i2c_rx_buf[1] & 0x7F;
+                controller.input_torque_ = tor_positive ? (float)tor_int / 250.0f : -(float)tor_int / 250.0f; // Maximum torque is 0.508 Nm
+                HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+            } break;
+
+            case CMD_SET_VEL_PID: {
+                controller.config_.vel_gain = (float)i2c_rx_buf[1] / 10000.0f; // Gain is between 0 and 0.0256
+                controller.config_.vel_integrator_gain = (float)i2c_rx_buf[2] / 100.0f; // Integrator gain is between 0 and 2.55
+                HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+            } break;
+
+            case CMD_GET_VEL_PID: {
+                i2c_tx_buf[0] = (uint8_t)(controller.config_.vel_gain * 10000.0f);
+                i2c_tx_buf[1] = (uint8_t)(controller.config_.vel_integrator_gain * 100.0f);
+                HAL_I2C_Slave_Transmit_IT(&hi2c1, i2c_tx_buf, sizeof(i2c_tx_buf));
+            } break;
+
+            default:
+                HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+                break;
+        }            
+    }
+}
+
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c == &hi2c1) {
+        HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+    }
+}
+
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+    if (hi2c == &hi2c1) {
+        HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+    }
+}
+
 volatile uint32_t repetition = 0;
 volatile uint32_t timestamp_ = 0;
 volatile bool counting_down_ = false;
@@ -199,7 +273,7 @@ int main(void)
     MX_GPIO_Init();
     MX_ADC1_Init();
     MX_DAC_Init();
-    // MX_I2C1_Init();
+    MX_I2C1_Init();
     MX_SPI2_Init();
     MX_TIM1_Init();
     MX_TIM2_Init();
@@ -212,7 +286,11 @@ int main(void)
     HAL_NVIC_SetPriority(TIM1_UP_TIM10_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(TIM1_UP_TIM10_IRQn);
 
-    // HAL_I2C_Slave_Receive_DMA(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
+    uint8_t i2c_addr = 0x10;
+    HAL_I2C_DeInit(&hi2c1);
+    hi2c1.Init.OwnAddress1 = i2c_addr << 1;
+    HAL_I2C_Init(&hi2c1);
+    HAL_I2C_Slave_Receive_IT(&hi2c1, i2c_rx_buf, sizeof(i2c_rx_buf));
 
     HAL_GPIO_WritePin(LED1_GPIO_Port, LED1_Pin, GPIO_PIN_SET);
 

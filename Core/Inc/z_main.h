@@ -4,7 +4,7 @@
 #include "main.h"
 #include "adc.h"
 #include "dac.h"
-// #include "i2c.h"
+#include "i2c.h"
 #include "spi.h"
 #include "tim.h"
 #include "gpio.h"
@@ -13,13 +13,25 @@
 static constexpr float CURRENT_MEAS_PERIOD_S = 2 * ((float)TIM2_PERIOD_CLOCKS * 2) * (float)(TIM1_REPETITION + 1) / (float)APB2_TIM1_FREQ;
 
 struct vel_command_t {
-  float velocity;
-  float torque;
-  uint16_t timestamp;
+    float velocity;
+    float torque;
+    uint16_t timestamp;
 };
 struct tor_command_t {
-  float torque;
-  uint16_t timestamp;
+    float torque;
+    uint16_t timestamp;
+};
+enum CommandHeader : uint8_t { // Only consider the upper 4 bits as the command header
+    CMD_SET_MODE = 0x00,
+    CMD_VEL_TOR = 0x30,
+    CMD_TOR = 0xC0,
+    CMD_SET_VEL_PID = 0x50,
+    CMD_GET_VEL_PID = 0xA0,
+};
+enum CommandMode : uint8_t {
+    MODE_IDLE = 0,
+    MODE_VEL_TOR = 0x0E,
+    MODE_TOR =0xE0,
 };
 
 #ifdef __cplusplus
