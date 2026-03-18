@@ -11,7 +11,7 @@ struct subscription_t {
 
 const Stm32Gpio Stm32Gpio::none{nullptr, 0};
 
-#define GPIO_MODE             0x00000003U
+// #define GPIO_MODE             0x00000003U
 #define GPIO_OUTPUT_TYPE      0x00000010U
 
 
@@ -22,14 +22,6 @@ bool Stm32Gpio::config(uint32_t mode, uint32_t pull, uint32_t speed) {
         __HAL_RCC_GPIOB_CLK_ENABLE();
     } else if (port_ == GPIOC) {
         __HAL_RCC_GPIOC_CLK_ENABLE();
-    } else if (port_ == GPIOD) {
-        __HAL_RCC_GPIOD_CLK_ENABLE();
-    } else if (port_ == GPIOE) {
-        __HAL_RCC_GPIOE_CLK_ENABLE();
-    } else if (port_ == GPIOF) {
-        __HAL_RCC_GPIOF_CLK_ENABLE();
-    } else if (port_ == GPIOG) {
-        __HAL_RCC_GPIOG_CLK_ENABLE();
     } else {
         return false;
     }

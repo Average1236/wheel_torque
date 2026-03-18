@@ -29,7 +29,7 @@ project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
 # Enable CMake support for ASM and C languages
-enable_language(C ASM)
+enable_language(C CXX ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
@@ -45,11 +45,18 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/main.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/motor.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/controller.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/encoder.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/stm32_gpio.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Src/stm32_spi_arbiter.cpp
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_CURRENT_SOURCE_DIR}/Core/Inc
 )
 
 # Add project symbols (macros)

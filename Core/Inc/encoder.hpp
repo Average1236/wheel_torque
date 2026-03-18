@@ -2,6 +2,7 @@
 #define __ENCODER_HPP
 
 #include "z_main.h"
+#include "stm32_spi_arbiter.hpp"
 
 class Encoder {
 public:
@@ -9,19 +10,19 @@ public:
         ERROR_NONE                       = 0x00000000,
         ERROR_UNSTABLE_GAIN              = 0x00000001,
         ERROR_NO_RESPONSE                = 0x00000002,
-        ERROR_ABS_SPI_COM_FAIL           = 0x00000004,
+        // ERROR_ABS_SPI_COM_FAIL           = 0x00000004,
     };
     struct Config_t {
-        float bandwidth = 1000.0f; // PLL bandwidth [Hz]
+        float bandwidth = 3000.0f; // PLL bandwidth [Hz]
         uint32_t cpr = 1 << 14; // counts per revolution
         float circular_range = 1.0f; // [turn] range of the circular tracking, usually set to 1 turn but can be set smaller for better low-speed performance at the cost of reduced max speed
+        
+        float direction = -1.0f; // 1 or -1, this is used to correct the direction of the encoder without having to change the wiring
     };
 
     Encoder(Stm32SpiArbiter* spi_arbiter, Stm32Gpio abs_spi_cs_gpio);
 
-    void set_error(Error error) {
-        error_ |= error;
-    }
+    void set_error(Error error);
     void update_pll_gains();
     void set_linear_count(int32_t count);
     void set_circular_count(int32_t count);

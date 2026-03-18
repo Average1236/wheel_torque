@@ -31,7 +31,7 @@ Encoder::Encoder(Stm32SpiArbiter* spi_arbiter, Stm32Gpio abs_spi_cs_gpio) : spi_
         .CLKPolarity = SPI_POLARITY_LOW,
         .CLKPhase = SPI_PHASE_2EDGE,
         .NSS = SPI_NSS_SOFT,
-        .BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64,
+        .BaudRatePrescaler = SPI_BAUDRATEPRESCALER_32,
         .FirstBit = SPI_FIRSTBIT_MSB,
         .TIMode = SPI_TIMODE_DISABLE,
         .CRCCalculation = SPI_CRCCALCULATION_DISABLE,
@@ -39,6 +39,10 @@ Encoder::Encoder(Stm32SpiArbiter* spi_arbiter, Stm32Gpio abs_spi_cs_gpio) : spi_
     };
     as5047p_read_angle_cmd(abs_spi_dma_tx_);
     abs_spi_cs_pin_init();
+}
+
+void Encoder::set_error(Error error) {
+    error_ |= error;
 }
 
 // two order PLL equations:
@@ -157,6 +161,7 @@ void Encoder::abs_spi_cb(bool success) {
 
 
         pos_abs_ = pos;
+        pos_abs_debug = pos;
         abs_spi_pos_updated_ = true;
     }
 
@@ -265,20 +270,21 @@ bool Encoder::update() {
     }
 
     // Outputs from Encoder for Controller
-    pos_estimate_ = pos_estimate_counts_ / (float)config_.cpr;
-    vel_estimate_ = vel_estimate_counts_ / (float)config_.cpr;
+    pos_estimate_ = pos_estimate_counts_ / (float)config_.cpr * config_.direction;
+    vel_estimate_ = vel_estimate_counts_ / (float)config_.cpr * config_.direction;
 
     // debug variables
     pos_abs_debug = pos_abs_;
-    pos_estimate_debug = pos_estimate_counts_ / (float)config_.cpr;
-    
+    pos_estimate_debug = pos_estimate_counts_ / (float)config_.cpr * config_.direction;
+    vel_estimate_debug = vel_estimate_counts_ / (float)config_.cpr * config_.direction;
+
     // TODO: we should strictly require that this value is from the previous iteration
     // to avoid spinout scenarios. However that requires a proper way to reset
     // the encoder from error states.
     float pos_circular = pos_circular_.any().value_or(0.0f);
     pos_circular +=  wrap_pm((pos_cpr_counts_ - pos_cpr_counts_last) / (float)config_.cpr, 1.0f);
     pos_circular = fmodf_pos(pos_circular, config_.circular_range);
-    pos_circular_ = pos_circular;
+    pos_circular_ = pos_circular * config_.direction;
     // debug variable
     pose_cirular_debug = pos_circular;
 

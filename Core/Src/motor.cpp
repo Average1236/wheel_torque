@@ -1,5 +1,15 @@
 #include "motor.hpp"
 
+// Debug
+volatile float dc_calib_running_since_debug = 0;
+volatile float dc_calib_debug = 0;
+volatile uint32_t timing_debug = 0;
+volatile float current_meas_debug = 0;
+volatile float current_setpoint_debug = 0;
+volatile float torque_direction_debug = 0;
+volatile float current_error_debug = 0;
+volatile float current_integral_debug = 0;
+
 static constexpr auto CURRENT_ADC_LOWER_BOUND = (uint32_t)((float)(1 << 12) * CURRENT_SENSE_MIN_VOLT / 3.3f);
 static constexpr auto CURRENT_ADC_UPPER_BOUND = (uint32_t)((float)(1 << 12) * CURRENT_SENSE_MAX_VOLT / 3.3f);
 
@@ -22,9 +32,11 @@ void Motor::current_meas_cb(std::optional<float> current) {
         armed_state_++;
         return;
     }
-    bool dc_calib_valid = (dc_calib_running_since_ >= config_.dc_calib_tau * 7.5f) && (abs(dc_calib_) < config_.max_dc_calib_);
+    bool dc_calib_valid = (dc_calib_running_since_ >= config_.dc_calib_tau * 7.5f) && (std::abs(dc_calib_) < config_.max_dc_calib_);
     if (current.has_value() && dc_calib_valid) {
+        dc_calib_valid_ = true;
         float current_val = current.value() - dc_calib_;
+        current_val = current_filter_.process(current_val); // Apply Butterworth filter
         if (current_val > config_.current_limit || current_val < -config_.current_limit) {
         disarm_with_error(Error::ERROR_OVERCURRENT);
         } else {
@@ -32,6 +44,8 @@ void Motor::current_meas_cb(std::optional<float> current) {
         }
     } else if (is_armed_) {
         disarm_with_error(Error::ERROR_UNKNOWN_CURRENT_MEASUREMENT);
+    } else {
+        current_meas_ = std::nullopt;
     }
 }
 
@@ -75,6 +89,8 @@ void Motor::arm() {
   CRITICAL_SECTION() {
     // Reset controller states, integrators, setpoints, etc.
     // axis_->controller_.reset();
+    current_filter_.init(1.0f / CURRENT_MEAS_PERIOD_S, config_.current_filter_cutoff);
+    current_filter_.reset();
     armed_state_ = 1;
     is_armed_ = true;
 
@@ -96,13 +112,13 @@ void Motor::apply_pwm_timings(uint16_t timing, float torque_dir, bool tentative)
         TIM_TypeDef* tim = htim->Instance;
         switch (timer_channel_)
         {
-        case 1:
+        case TIM_CHANNEL_1:
           tim->CCR1 = timing;
           break;
-        case 2:
+        case TIM_CHANNEL_2:
           tim->CCR2 = timing;
           break;
-        case 3:
+        case TIM_CHANNEL_3:
           tim->CCR3 = timing;
           break;
         
@@ -141,16 +157,19 @@ float Motor::max_available_torque() {
 void Motor::dc_calib_cb(std::optional<float> current) {
     const float dc_calib_period = static_cast<float>(2 * TIM2_PERIOD_CLOCKS * TIM2_REPETITION) / APB1_TIM2_TIM14_FREQ;
     
-        if (current.has_value()) {
-            if (dc_calib_running_since_ <= config_.dc_calib_tau * 7.5f) {
-                const float calib_filter_k = std::min(dc_calib_period / config_.dc_calib_tau, 1.0f);
-                dc_calib_ += (current.value() - dc_calib_) * calib_filter_k;
-                dc_calib_running_since_ += dc_calib_period;
-            }
-        } else {
-            dc_calib_ = 0.0f;
-            dc_calib_running_since_ = 0.0f;
+    if (current.has_value()) {
+        if (dc_calib_running_since_ <= config_.dc_calib_tau * 7.5f) {
+            const float calib_filter_k = std::min(dc_calib_period / config_.dc_calib_tau, 1.0f);
+            dc_calib_ += (current.value() - dc_calib_) * calib_filter_k;
+            dc_calib_running_since_ += dc_calib_period;
         }
+    } else {
+        dc_calib_ = 0.0f;
+        dc_calib_running_since_ = 0.0f;
+    }
+    // Debug
+    dc_calib_running_since_debug = dc_calib_running_since_;
+    dc_calib_debug = dc_calib_;
 }
 
 
@@ -168,26 +187,57 @@ void Motor::update() {
         disarm_with_error(Error::ERROR_UNKNOWN_VELOCITY);
         return;
     }
-    float torque_abs = std::abs(maybe_torque.value());
-    float torque_direction = (maybe_torque.value() > 0) ? config_.direction : -config_.direction;
-    float work_direction = (maybe_torque.value() * maybe_vel.value() > 0) ? 1.0f : -1.0f;
-
-    float current_setpoint = torque_abs / config_.torque_constant * work_direction;
-    current_setpoint = std::clamp(current_setpoint, -config_.current_limit, config_.current_limit);
-
-    float current_error = current_setpoint - current_meas_;
-    float modulation = config_.current_p_gain * current_error + current_integral_;
-    float modulation_abs = std::abs(modulation);
-    if (modulation_abs > 1.0f) {
-        modulation = std::copysign(1.0f, modulation);
-
-        current_integral_ *= 0.9f; // anti-windup, this makes the integral term decay when the controller is saturated
-    } else {
-        current_integral_ += config_.current_i_gain * current_error * CURRENT_MEAS_PERIOD_S;
+    if (!current_meas_.has_value()) {
+        disarm_with_error(Error::ERROR_UNKNOWN_CURRENT_MEASUREMENT);
+        return;
     }
 
-    uint32_t timing = (uint32_t)((float)TIM2_PERIOD_CLOCKS * modulation_abs);
-    apply_pwm_timings(timing, torque_direction, false);
+    // Debug
+    current_meas_debug = current_meas_.value();
+
+    float torque_abs = std::abs(maybe_torque.value());
+    torque_direction_ = (maybe_torque.value() > 0) ? 1 : -1;
+    torque_direction_debug = torque_direction_;
+
+    float current_setpoint = maybe_torque.value() / config_.torque_constant;
+    current_setpoint_ = std::clamp(current_setpoint, -config_.current_limit, config_.current_limit);
+    // float current_setpoint = torque_abs / config_.torque_constant;
+    // current_setpoint_ = std::clamp(current_setpoint, 0.0f, config_.current_limit);
+    current_setpoint_debug = current_setpoint;
+
+
 }
 
+void Motor::pwm_update_cb() {
+    uint32_t timing = 0;
+    if (is_armed_ && current_meas_.has_value()) {
+        float current_error = (current_setpoint_ - current_meas_.value() * last_torque_direction_) * torque_direction_;
+        current_error_debug = current_error;
 
+        float modulation = (config_.current_p_gain * current_error + current_integral_);
+        if (modulation < 0) {
+            modulation = 0.0f;
+            // modulation = -modulation;
+            // torque_direction_ = -torque_direction_;
+        }
+        if (modulation > 1.0f) {
+            modulation = 1.0f;
+
+            current_integral_ *= 0.9f; // anti-windup, this makes the integral term decay when the controller is saturated
+        } else {
+            current_integral_ += config_.current_i_gain * current_error * CURRENT_MEAS_PERIOD_S;
+        }
+
+        current_integral_debug = current_integral_;
+
+        timing = (uint32_t)((float)TIM2_PERIOD_CLOCKS * modulation);
+    } else if (is_armed_) {
+        disarm_with_error(Error::ERROR_UNKNOWN_CURRENT_MEASUREMENT);
+    }
+
+    // Debug
+    timing_debug = timing;
+    apply_pwm_timings(timing, torque_direction_, false);
+
+    last_torque_direction_ = torque_direction_;
+}

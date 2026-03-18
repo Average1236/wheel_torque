@@ -40,14 +40,15 @@ bool Stm32SpiArbiter::start() {
     
     HAL_StatusTypeDef status = HAL_ERROR;
 
-    if (hspi_->hdmatx->State != HAL_DMA_STATE_READY || hspi_->hdmarx->State != HAL_DMA_STATE_READY) {
-        // This can happen if the DMA or interrupt priorities are not configured properly.
-        status = HAL_BUSY;
-        goto done;
-    }
+    // if (hspi_->hdmatx->State != HAL_DMA_STATE_READY || hspi_->hdmarx->State != HAL_DMA_STATE_READY) {
+    //     // This can happen if the DMA or interrupt priorities are not configured properly.
+    //     status = HAL_BUSY;
+    //     goto done;
+    // }
 
     if (task.tx_buf && task.rx_buf) {
-        status = HAL_SPI_TransmitReceive_DMA(hspi_, (uint8_t*)task.tx_buf, task.rx_buf, task.length);
+        // TODO: DMA mode does not work for some reason. For now we can just use the interrupt mode.
+        status = HAL_SPI_TransmitReceive_IT(hspi_, (uint8_t*)task.tx_buf, task.rx_buf, task.length);
     } else if (task.tx_buf) {
         status = HAL_SPI_Transmit_DMA(hspi_, (uint8_t*)task.tx_buf, task.length);
     } else if (task.rx_buf) {

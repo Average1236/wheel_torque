@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 
+
 class Controller {
 public:
     enum Error {
@@ -21,12 +22,12 @@ public:
 
     struct Config_t
     {
-        ControlMode control_mode = MODE_VELOCITY_CONTROL;
-        float vel_gain = 0.3f;
-        float vel_integrator_gain = 0.1f;
-        float vel_limit = 50.0f;
+        ControlMode control_mode = MODE_IDLE;
+        float vel_gain = 0.001f;
+        float vel_integrator_gain = 0.9f;
+        float vel_limit = 100.0f;
         float vel_integrator_limit = INFINITY;
-        bool enable_torque_mode_vel_limit = true;
+        bool enable_torque_mode_vel_limit = false;
 
         void set_control_mode(ControlMode mode) {
             control_mode = mode;
@@ -54,7 +55,7 @@ public:
 
     InputPort<float> vel_estimate_src_;
 
-    OutputPort<float> torque_out_;
+    OutputPort<float> torque_out_{0.0f};
 };
 
 // this is technically not thread-safe but practically it might be

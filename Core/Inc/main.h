@@ -32,7 +32,7 @@ extern "C" {
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32f405xx.h"
-#include "stm32f4xx_hal_dac.h"
+// #include "stm32f4xx_hal_dac.h"
 /* USER CODE END Includes */
 
 /* Exported types ------------------------------------------------------------*/
@@ -58,9 +58,11 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
+#define APB2_TIM1_FREQ 168000000
+#define TIM2_REPETITION 1
+#define TIM1_REPETITION 2
 #define TIM2_PERIOD_CLOCKS 1680
 #define APB1_TIM2_TIM14_FREQ 84000000
-#define TIM2_REPETITION 5
 #define M_RESET_Pin GPIO_PIN_13
 #define M_RESET_GPIO_Port GPIOC
 #define M_FF2_Pin GPIO_PIN_14

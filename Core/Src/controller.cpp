@@ -1,5 +1,15 @@
 #include "controller.hpp"
 
+// Debug
+volatile float torque_out_debug = 0;
+
+void Controller::reset() {
+    vel_setpoint_ = 0.0f;
+    torque_setpoint_ = 0.0f;
+    vel_integrator_torque_ = 0.0f;
+    error_ = Error::ERROR_NONE;
+}
+
 static float limitVel(const float vel_limit, const float vel_estimate, const float vel_gain, const float torque) {
     float Tmax = (vel_limit - vel_estimate) * vel_gain;
     float Tmin = (-vel_limit - vel_estimate) * vel_gain;
@@ -10,7 +20,7 @@ bool Controller::update() {
     std::optional<float> vel_estimate = vel_estimate_src_.present();
 
     vel_setpoint_ = std::clamp(input_vel_, -config_.vel_limit, config_.vel_limit);
-    float torque_limit = motor_ ? motor_->max_available_torque() : 0.0f;
+    float torque_limit = motor_->max_available_torque();
     torque_setpoint_ = std::clamp(input_torque_, -torque_limit, torque_limit);
 
     float torque = torque_setpoint_;
@@ -60,6 +70,9 @@ bool Controller::update() {
     }
 
     torque_out_ = torque;
+
+    // Debug
+    torque_out_debug = torque;
 
     return true;
 }
