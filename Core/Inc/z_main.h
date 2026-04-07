@@ -10,7 +10,7 @@
 #include "gpio.h"
 #include "dma.h"
 
-static constexpr float CURRENT_MEAS_PERIOD_S = 2 * ((float)TIM2_PERIOD_CLOCKS * 2) * (float)(TIM1_REPETITION + 1) / (float)APB2_TIM1_FREQ;
+static constexpr float CURRENT_MEAS_PERIOD_S = 2 * ((float)TIM1_PERIOD_CLOCKS * 2) * (float)(TIM1_REPETITION + 1) / (float)APB2_TIM1_FREQ;
 
 struct vel_command_t {
     float velocity;

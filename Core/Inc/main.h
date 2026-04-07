@@ -61,7 +61,7 @@ void Error_Handler(void);
 #define APB2_TIM1_FREQ 168000000
 #define TIM2_REPETITION 1
 #define TIM1_REPETITION 2
-#define TIM2_PERIOD_CLOCKS 1680
+#define TIM1_PERIOD_CLOCKS 1680
 #define APB1_TIM2_TIM14_FREQ 84000000
 #define M_RESET_Pin GPIO_PIN_13
 #define M_RESET_GPIO_Port GPIOC
@@ -100,7 +100,7 @@ void Error_Handler(void);
 #define CURRENT_SENSE_MIN_VOLT  0.0f
 #define CURRENT_SENSE_MAX_VOLT  3.3f
 
-#define SHUNT_RESISTANCE 0.075f
+#define SHUNT_RESISTANCE 0.1f
 #define CURRENT_MEAS_GAIN 19.0f
 /* USER CODE END Private defines */
 

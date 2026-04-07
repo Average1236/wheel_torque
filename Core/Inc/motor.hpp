@@ -55,16 +55,15 @@ public:
     struct Config_t
     {
         float current_limit = 5.3f; // rated current + some margin [A]
-        float current_p_gain = 1.0f;
+        float current_p_gain = 0.1f;
         float current_i_gain=50.0f;
         float shunt_conductance = 1.0f / SHUNT_RESISTANCE;
         float dc_calib_tau = 0.2f;
         float max_dc_calib_ = 1.5f;
+        float max_modulation = 0.24f;
 
-        // float direction = -1.0f; // 1 or -1, this is used to correct the direction of the motor without having to change the wiring
-
-        float torque_constant = 0.0355f; // Nm/A
-        float current_filter_cutoff = 10000.0f; // Hz, Butterworth filter cutoff freq
+        float torque_constant = 0.00897f; // Nm/A
+        float current_filter_cutoff = 11000.0f; // Hz, Butterworth filter cutoff freq
     };
     
     enum Error {

@@ -17,7 +17,8 @@ static float limitVel(const float vel_limit, const float vel_estimate, const flo
 }
 
 bool Controller::update() {
-    std::optional<float> vel_estimate = vel_estimate_src_.present();
+    // std::optional<float> vel_estimate = vel_estimate_src_.present();
+    std::optional<float> vel_estimate = 0.0f; // TODO: remove this when the encoder is working
 
     vel_setpoint_ = std::clamp(input_vel_, -config_.vel_limit, config_.vel_limit);
     float torque_limit = motor_->max_available_torque();

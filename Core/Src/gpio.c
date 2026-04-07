@@ -38,6 +38,7 @@
         * Output
         * EVENT_OUT
         * EXTI
+     PB3   ------> S_TIM2_CH2
 */
 void MX_GPIO_Init(void)
 {
@@ -85,6 +86,14 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : M_PWM_Pin */
+  GPIO_InitStruct.Pin = M_PWM_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
+  HAL_GPIO_Init(M_PWM_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : M_DIRO_Pin */
   GPIO_InitStruct.Pin = M_DIRO_Pin;

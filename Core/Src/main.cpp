@@ -7,7 +7,7 @@ volatile uint32_t debug_ControlLoop_IRQHandler_count = 0;
 #define ControlLoop_IRQHandler USART1_IRQHandler
 #define ControlLoop_IRQn USART1_IRQn
 
-Motor motor(&htim2, TIM_CHANNEL_2);
+Motor motor(&htim1, TIM_CHANNEL_1);
 Controller controller;
 Stm32SpiArbiter spi_arbiter{&hspi2};
 Encoder encoder(&spi_arbiter, {GPIOB, GPIO_PIN_12}); // SPI2 CS on PB12
@@ -29,9 +29,9 @@ void start_timers() {
         *     90° phase shift.
         *  2. Each TIM13 reload coincides with a TIM1 lower update event.
         */
-        Stm32Timer::start_synchronously<2>(
-            {&htim1, &htim2},
-            {0, 0 /* TIM2 is on a clock as fast as TIM1 */}
+        Stm32Timer::start_synchronously<1>(
+            {&htim1},
+            {0}
         );
 
         hadc1.Instance->CR2 |= ADC_EXTERNALTRIGCONVEDGE_RISING;
@@ -58,9 +58,6 @@ void start_adc_pwm() {
     HAL_ADC_Start(&hadc1);
 
     start_timers();
-
-    __HAL_TIM_CLEAR_IT(&htim2, TIM_IT_UPDATE);
-    __HAL_TIM_ENABLE_IT(&htim2, TIM_IT_UPDATE);
 }
 
 void start_control_loop() {
@@ -215,7 +212,7 @@ void TIM1_UP_TIM10_IRQHandler(void) {
     }
 
     counting_down_ = counting_down;
-    timestamp_ += TIM2_PERIOD_CLOCKS * (TIM1_REPETITION + 1);
+    timestamp_ += TIM1_PERIOD_CLOCKS * (TIM1_REPETITION + 1);
 
     if (!counting_down) {
     // if (counting_down) {
@@ -259,8 +256,9 @@ void ControlLoop_IRQHandler(void) {
     motor.pwm_update_cb();
 
     volatile uint32_t a = 0;
+    (void)a;
 
-    if (timestamp_ != timestamp + TIM2_PERIOD_CLOCKS * (TIM1_REPETITION + 1)) {
+    if (timestamp_ != timestamp + TIM1_PERIOD_CLOCKS * (TIM1_REPETITION + 1)) {
         motor.disarm_with_error(Motor::Error::ERROR_CONTROL_DEADLINE_MISSED);
     }
 
@@ -276,7 +274,6 @@ int main(void)
     MX_I2C1_Init();
     MX_SPI2_Init();
     MX_TIM1_Init();
-    MX_TIM2_Init();
     MX_TIM11_Init();
     MX_TIM14_Init();
 
@@ -313,18 +310,15 @@ int main(void)
 
     start_control_loop();
 
-    // HAL_Delay(1000);
+    HAL_Delay(1000);
 
-    // controller.config_.set_control_mode(Controller::MODE_TORQUE_CONTROL);
-    // controller.input_torque_ = -0.005f;
+    controller.config_.set_control_mode(Controller::MODE_TORQUE_CONTROL);
+    controller.input_torque_ = -0.01f;
 
-    // // controller.config_.set_control_mode(Controller::MODE_VELOCITY_CONTROL);
-    // // controller.input_vel_ = 10.0f;
+    HAL_Delay(10000);
 
-    // HAL_Delay(5000);
-
-    // controller.input_torque_ = 0.0f;
-    // controller.input_vel_ = 0.0f;
+    controller.input_torque_ = 0.0f;
+    controller.input_vel_ = 0.0f;
 
     while (1);
 }

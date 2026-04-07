@@ -9,6 +9,7 @@ volatile float current_setpoint_debug = 0;
 volatile float torque_direction_debug = 0;
 volatile float current_error_debug = 0;
 volatile float current_integral_debug = 0;
+volatile float modulation_debug = 0;
 
 static constexpr auto CURRENT_ADC_LOWER_BOUND = (uint32_t)((float)(1 << 12) * CURRENT_SENSE_MIN_VOLT / 3.3f);
 static constexpr auto CURRENT_ADC_UPPER_BOUND = (uint32_t)((float)(1 << 12) * CURRENT_SENSE_MAX_VOLT / 3.3f);
@@ -155,7 +156,7 @@ float Motor::max_available_torque() {
  * @brief Called when the underlying hardware timer triggers an update event.
  */
 void Motor::dc_calib_cb(std::optional<float> current) {
-    const float dc_calib_period = static_cast<float>(2 * TIM2_PERIOD_CLOCKS * TIM2_REPETITION) / APB1_TIM2_TIM14_FREQ;
+    const float dc_calib_period = static_cast<float>(2 * TIM1_PERIOD_CLOCKS * TIM1_REPETITION) / APB2_TIM1_FREQ;
     
     if (current.has_value()) {
         if (dc_calib_running_since_ <= config_.dc_calib_tau * 7.5f) {
@@ -219,18 +220,21 @@ void Motor::pwm_update_cb() {
             modulation = 0.0f;
             // modulation = -modulation;
             // torque_direction_ = -torque_direction_;
-        }
-        if (modulation > 1.0f) {
-            modulation = 1.0f;
-
-            current_integral_ *= 0.9f; // anti-windup, this makes the integral term decay when the controller is saturated
         } else {
-            current_integral_ += config_.current_i_gain * current_error * CURRENT_MEAS_PERIOD_S;
+            if (modulation > config_.max_modulation) {
+                modulation = config_.max_modulation;
+
+                current_integral_ *= 0.9f; // anti-windup, this makes the integral term decay when the controller is saturated
+            } else {
+                current_integral_ += config_.current_i_gain * current_error * CURRENT_MEAS_PERIOD_S;
+            }
         }
 
         current_integral_debug = current_integral_;
 
-        timing = (uint32_t)((float)TIM2_PERIOD_CLOCKS * modulation);
+        modulation_debug = modulation;
+
+        timing = (uint32_t)((float)TIM1_PERIOD_CLOCKS * modulation);
     } else if (is_armed_) {
         disarm_with_error(Error::ERROR_UNKNOWN_CURRENT_MEASUREMENT);
     }
